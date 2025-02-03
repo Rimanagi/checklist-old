@@ -4,10 +4,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import jwt
 import asyncio
+
+from bson import ObjectId  # Импортируем ObjectId
+from database import locations_collection
 
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
@@ -23,11 +27,13 @@ fake_users_db = {}
 
 # Глобальные переменные для регистрации внешних серверов
 registered_servers = []  # Список словарей с информацией о сервере: { "name": ..., "ip": ... }
-update_clients = set()   # WebSocket‑соединения браузеров, получающих обновления
+update_clients = set()  # WebSocket‑соединения браузеров, получающих обновления
+
 
 class User(BaseModel):
     username: str
     password: str
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -35,11 +41,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+
 def verify_password(plain_password, hashed_password):
     return plain_password == hashed_password
 
+
 def get_password_hash(password):
     return password
+
 
 def get_current_user_from_cookie(request: Request):
     token = request.cookies.get("access_token")
@@ -54,6 +63,7 @@ def get_current_user_from_cookie(request: Request):
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+
 # Функция для рассылки обновлённого списка серверов всем подключённым клиентам
 async def broadcast_server_list():
     for client in list(update_clients):
@@ -62,13 +72,22 @@ async def broadcast_server_list():
         except Exception:
             update_clients.remove(client)
 
+
 #############################################
 # Роуты для регистрации, логина и главной страницы
 #############################################
+@app.get("/locations")
+async def get_locations():
+    # Получаем документ из коллекции
+    location_doc = await locations_collection.find_one({})
+    # Преобразуем данные в JSON-совместимый формат, заменяя ObjectId на строку
+    return jsonable_encoder(location_doc, custom_encoder={ObjectId: str})
+
 
 @app.get("/register", response_class=HTMLResponse)
 def get_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
+
 
 @app.post("/register", response_class=HTMLResponse)
 def register(request: Request, username: str = Form(...), password: str = Form(...)):
@@ -82,9 +101,11 @@ def register(request: Request, username: str = Form(...), password: str = Form(.
     # При успешной регистрации перенаправляем на страницу логина с сообщением
     return RedirectResponse(url="/login?msg=Регистрация успешна! Теперь вы можете войти.", status_code=302)
 
+
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request, msg: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "msg": msg})
+
 
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
@@ -99,6 +120,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
+
 @app.get("/", response_class=HTMLResponse)
 def main_page(request: Request):
     try:
@@ -107,6 +129,7 @@ def main_page(request: Request):
         return RedirectResponse(url="/register", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
+
 @app.get("/servers")
 def get_servers(request: Request):
     try:
@@ -114,6 +137,7 @@ def get_servers(request: Request):
     except HTTPException:
         return RedirectResponse(url="/register", status_code=302)
     return {"message": f"Список серверов для пользователя {username}"}
+
 
 #############################################
 # WebSocket‑эндпоинты для регистрации серверов и рассылки обновлений
@@ -144,6 +168,7 @@ async def ws_server_register(websocket: WebSocket):
             registered_servers.remove(server_info)
             await broadcast_server_list()
 
+
 # Эндпоинт для браузерных клиентов, которые получают обновления списка серверов
 @app.websocket("/ws/servers/updates")
 async def ws_server_updates(websocket: WebSocket):
@@ -159,6 +184,7 @@ async def ws_server_updates(websocket: WebSocket):
     finally:
         update_clients.remove(websocket)
 
+
 # Дополнительный WebSocket‑эндпоинт (например, для других целей)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -169,6 +195,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_text(f"Message received: {data}")
     except WebSocketDisconnect:
         pass
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
