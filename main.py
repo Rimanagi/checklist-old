@@ -1,6 +1,6 @@
 import uvicorn
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Header
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -16,17 +16,12 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
-
+# Простое хранилище пользователей (НЕ для продакшена)
 fake_users_db = {}
 
 class User(BaseModel):
     username: str
     password: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -35,13 +30,16 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_password(plain_password, hashed_password):
-    # Просто сравниваем пароли
     return plain_password == hashed_password
 
 def get_password_hash(password):
-    return password  # Для теста, просто вернем пароль как есть
+    # В реальном проекте обязательно используйте хэширование!
+    return password
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user_from_cookie(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -51,46 +49,66 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+# GET‑обработчик страницы регистрации
 @app.get("/register", response_class=HTMLResponse)
 def get_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
-@app.post("/register")
-def register(user: User):
-    if user.username in fake_users_db:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
-    fake_users_db[user.username] = get_password_hash(user.password)
-    return {"message": "User registered successfully"}
-    # fake_users_db[user.username] = user.password  # Это место следует улучшить для безопасности
+# POST‑обработчик регистрации
+@app.post("/register", response_class=HTMLResponse)
+def register(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username in fake_users_db:
+        # Если такой пользователь уже существует, возвращаем страницу регистрации с ошибкой
+        return templates.TemplateResponse(
+            "register.html",
+            {"request": request, "error": "Пользователь с таким именем уже существует"}
+        )
+    fake_users_db[username] = get_password_hash(password)
+    # При успешной регистрации перенаправляем на страницу логина с сообщением об успехе
+    return RedirectResponse(url="/login?msg=Регистрация успешна! Теперь вы можете войти.", status_code=302)
 
-
+# GET‑обработчик страницы логина
 @app.get("/login", response_class=HTMLResponse)
-def get_login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+def get_login_page(request: Request, msg: str = None):
+    return templates.TemplateResponse("login.html", {"request": request, "msg": msg})
 
-@app.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+# POST‑обработчик логина
+@app.post("/login", response_class=HTMLResponse)
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     user = fake_users_db.get(form_data.username)
     if not user or not verify_password(form_data.password, user):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        # При неверном логине/пароле возвращаем страницу логина с сообщением об ошибке
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Неверный логин или пароль"}
+        )
     access_token = create_access_token({"sub": form_data.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    response = RedirectResponse(url="/", status_code=302)
+    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    return response
 
+# Главная страница – доступна только аутентифицированным пользователям
 @app.get("/", response_class=HTMLResponse)
-def main_page(request: Request, token: str = Header(None)):
+def main_page(request: Request):
     try:
-        username = get_current_user(token)  # Используем get_current_user для авторизации
+        username = get_current_user_from_cookie(request)
     except HTTPException:
-        return RedirectResponse(url="/login")  # Перенаправляем на страницу логина, если нет токена или токен неверный
-
+        # Если пользователь не аутентифицирован, перенаправляем на страницу регистрации
+        return RedirectResponse(url="/register", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
-@app.get("/servers", dependencies=[Depends(get_current_user)])
-def get_servers():
-    return {"message": "List of servers"}
+# Пример защищённого API‑эндпоинта
+@app.get("/servers")
+def get_servers(request: Request):
+    try:
+        username = get_current_user_from_cookie(request)
+    except HTTPException:
+        return RedirectResponse(url="/register", status_code=302)
+    return {"message": f"Список серверов для пользователя {username}"}
 
+# Пример WebSocket‑эндпоинта
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket):
     await websocket.accept()
     try:
         while True:
@@ -100,4 +118,4 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
 
 if __name__ == "__main__":
-    uvicorn.run('main:app', host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

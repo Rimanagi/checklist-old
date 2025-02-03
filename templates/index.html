@@ -1,43 +1,40 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FastAPI WebSocket</title>
-    <link rel="stylesheet" href="/static/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Главная страница</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="container">
-        <div class="content">
-            <h2>Подключенные серверы:</h2>
-            <ul id="server-list"></ul>
-        </div>
-        <div class="sidebar">
-            <button class="btn" onclick="window.location='/create_checklist'">Создать чеклист</button>
-            <button class="btn" onclick="window.location='/checklists'">Список чеклистов</button>
-        </div>
+  <div class="container">
+    <h2>Добро пожаловать, {{ username }}!</h2>
+    <div class="content">
+      <h3>Подключенные серверы:</h3>
+      <ul id="server-list">
+        <!-- Здесь можно динамически подгружать данные -->
+      </ul>
     </div>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const token = localStorage.getItem("access_token"); // Читаем токен из localStorage
-
-            if (token) {
-                fetch("/", {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Bearer ${token}`
-                    }
-                })
-                .then(response => {
-                    if (response.status === 401) {
-                        window.location.href = "/login";
-                    }
-                });
-            } else {
-                window.location.href = "/login"; // Перенаправляем, если токен не найден
-            }
+    <div class="sidebar">
+      <button class="btn" onclick="window.location='/create_checklist'">Создать чеклист</button>
+      <button class="btn" onclick="window.location='/checklists'">Список чеклистов</button>
+    </div>
+  </div>
+  <script>
+    // Пример получения списка серверов через API
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/servers")
+        .then(response => response.json())
+        .then(data => {
+          const serverList = document.getElementById("server-list");
+          const li = document.createElement("li");
+          li.innerText = data.message;
+          serverList.appendChild(li);
+        })
+        .catch(error => {
+          console.error("Ошибка получения серверов:", error);
         });
-    </script>
+    });
+  </script>
 </body>
 </html>

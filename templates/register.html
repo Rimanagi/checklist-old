@@ -1,55 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-    <script src="/static/script.js?v=1.2"></script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register</title>
-    <link rel="stylesheet" href="/static/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Регистрация</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="container">
-        <h2>Register</h2>
-        <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="register()">Register</button>
-        <p id="message"></p>
-        <a href="/">Already have an account? Login</a>
-    </div>
-    <script>
-        async function register() {
-            const username = document.getElementById("username").value.trim();
-            const password = document.getElementById("password").value.trim();
-            const messageBox = document.getElementById("message");
-
-            if (!username || !password) {
-                messageBox.innerText = "Username and password are required!";
-                return;
-            }
-
-            const data = {
-                username: username,
-                password: password
-            };
-
-            const response = await fetch("/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(data)
-            });
-
-            const result = await response.json();
-            if (response.ok) {
-                messageBox.style.color = "green";
-                messageBox.innerText = "Registration successful! Redirecting to login...";
-                setTimeout(() => { window.location.href = "/login"; }, 2000); // Перенаправление на страницу логина
-            } else {
-                messageBox.style.color = "red";
-                messageBox.innerText = result.detail;
-            }
-        }
-    </script>
+  <div class="container">
+    <h2>Регистрация</h2>
+    <form method="post" action="/register">
+      <input type="text" name="username" placeholder="Имя пользователя" required>
+      <input type="password" name="password" placeholder="Пароль" required>
+      <button type="submit">Зарегистрироваться</button>
+    </form>
+    <!-- Если есть сообщение об ошибке регистрации -->
+    {% if error %}
+      <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <p>Уже есть аккаунт? <a href="/login">Войти</a></p>
+  </div>
 </body>
 </html>
