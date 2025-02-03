@@ -7,9 +7,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import jwt
+import asyncio
 
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
+# ALGORITHM = "SHA-3"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 app = FastAPI()
@@ -18,6 +20,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Простое хранилище пользователей (НЕ для продакшена)
 fake_users_db = {}
+
+# Глобальные переменные для регистрации внешних серверов
+registered_servers = []  # Список словарей с информацией о сервере: { "name": ..., "ip": ... }
+update_clients = set()   # WebSocket‑соединения браузеров, получающих обновления
 
 class User(BaseModel):
     username: str
@@ -33,7 +39,6 @@ def verify_password(plain_password, hashed_password):
     return plain_password == hashed_password
 
 def get_password_hash(password):
-    # В реальном проекте обязательно используйте хэширование!
     return password
 
 def get_current_user_from_cookie(request: Request):
@@ -49,35 +54,42 @@ def get_current_user_from_cookie(request: Request):
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-# GET‑обработчик страницы регистрации
+# Функция для рассылки обновлённого списка серверов всем подключённым клиентам
+async def broadcast_server_list():
+    for client in list(update_clients):
+        try:
+            await client.send_json(registered_servers)
+        except Exception:
+            update_clients.remove(client)
+
+#############################################
+# Роуты для регистрации, логина и главной страницы
+#############################################
+
 @app.get("/register", response_class=HTMLResponse)
 def get_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
-# POST‑обработчик регистрации
 @app.post("/register", response_class=HTMLResponse)
 def register(request: Request, username: str = Form(...), password: str = Form(...)):
     if username in fake_users_db:
-        # Если такой пользователь уже существует, возвращаем страницу регистрации с ошибкой
+        # Если пользователь уже существует – возвращаем сообщение об ошибке
         return templates.TemplateResponse(
             "register.html",
             {"request": request, "error": "Пользователь с таким именем уже существует"}
         )
     fake_users_db[username] = get_password_hash(password)
-    # При успешной регистрации перенаправляем на страницу логина с сообщением об успехе
+    # При успешной регистрации перенаправляем на страницу логина с сообщением
     return RedirectResponse(url="/login?msg=Регистрация успешна! Теперь вы можете войти.", status_code=302)
 
-# GET‑обработчик страницы логина
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request, msg: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "msg": msg})
 
-# POST‑обработчик логина
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     user = fake_users_db.get(form_data.username)
     if not user or not verify_password(form_data.password, user):
-        # При неверном логине/пароле возвращаем страницу логина с сообщением об ошибке
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Неверный логин или пароль"}
@@ -87,17 +99,14 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
-# Главная страница – доступна только аутентифицированным пользователям
 @app.get("/", response_class=HTMLResponse)
 def main_page(request: Request):
     try:
         username = get_current_user_from_cookie(request)
     except HTTPException:
-        # Если пользователь не аутентифицирован, перенаправляем на страницу регистрации
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/register", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
-# Пример защищённого API‑эндпоинта
 @app.get("/servers")
 def get_servers(request: Request):
     try:
@@ -106,9 +115,53 @@ def get_servers(request: Request):
         return RedirectResponse(url="/register", status_code=302)
     return {"message": f"Список серверов для пользователя {username}"}
 
-# Пример WebSocket‑эндпоинта
+#############################################
+# WebSocket‑эндпоинты для регистрации серверов и рассылки обновлений
+#############################################
+
+# Эндпоинт для регистрации внешних FastAPI серверов
+@app.websocket("/ws/servers/register")
+async def ws_server_register(websocket: WebSocket):
+    await websocket.accept()
+    server_info = None
+    try:
+        # Ожидаем от сервера JSON с данными: {"name": "ServerName"}
+        data = await websocket.receive_json()
+        server_name = data.get("name", "Unnamed")
+        server_ip = websocket.client.host  # IP адрес клиента
+        server_info = {"name": server_name, "ip": server_ip}
+        registered_servers.append(server_info)
+        await broadcast_server_list()
+        # Остаёмся в соединении (например, для heartbeat)
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        if server_info and server_info in registered_servers:
+            registered_servers.remove(server_info)
+            await broadcast_server_list()
+
+# Эндпоинт для браузерных клиентов, которые получают обновления списка серверов
+@app.websocket("/ws/servers/updates")
+async def ws_server_updates(websocket: WebSocket):
+    await websocket.accept()
+    update_clients.add(websocket)
+    # Отправляем сразу актуальный список
+    await websocket.send_json(registered_servers)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        update_clients.remove(websocket)
+
+# Дополнительный WebSocket‑эндпоинт (например, для других целей)
 @app.websocket("/ws")
-async def websocket_endpoint(websocket):
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
