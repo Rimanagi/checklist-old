@@ -6,7 +6,7 @@
   <title>Главная страница</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="bg-main">
   <div class="container">
     <h2>Добро пожаловать, {{ username }}!</h2>
     <div class="content">
@@ -21,7 +21,6 @@
     </div>
   </div>
   <script>
-    // Пример получения списка серверов через API
     document.addEventListener("DOMContentLoaded", function() {
       fetch("/servers")
         .then(response => response.json())

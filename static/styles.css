@@ -1,3 +1,4 @@
+/* Базовые стили для body (без фонового цвета, чтобы задавать его через классы) */
 body {
     font-family: 'Arial', sans-serif;
     display: flex;
@@ -5,9 +6,24 @@ body {
     align-items: center;
     height: 100vh;
     margin: 0;
+}
+
+/* Фон для страницы логина (оставляем текущий) */
+.bg-login {
     background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
+/* Фон для страницы регистрации — красный градиент */
+.bg-register {
+    background: linear-gradient(135deg, #f68b20, #ff4b2b);
+}
+
+/* Фон для главной страницы — зеленый градиент */
+.bg-main {
+    background: linear-gradient(135deg, #46ff6b, #3567ff);
+}
+
+/* Стили для контейнера и элементов внутри него */
 .container {
     width: 100%;
     max-width: 400px;

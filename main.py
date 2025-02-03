@@ -94,7 +94,7 @@ def main_page(request: Request):
         username = get_current_user_from_cookie(request)
     except HTTPException:
         # Если пользователь не аутентифицирован, перенаправляем на страницу регистрации
-        return RedirectResponse(url="/register", status_code=302)
+        return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
 # Пример защищённого API‑эндпоинта
