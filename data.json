@@ -1,0 +1,30 @@
+{
+  "Ambar": {
+    "loc_id": 1,
+    "type": "location",
+    "object_list": [
+      {
+        "name": "Установка 1",
+        "cr_code": "00000001"
+      },
+      {
+        "name": "Установка 2",
+        "cr_code": "00000002"
+      }
+    ]
+  },
+  "Конюшня": {
+    "loc_id": 2,
+    "type": "location",
+    "object_list": [
+      {
+        "name": "Установка 3",
+        "cr_code": "00000003"
+      },
+      {
+        "name": "Установка 4",
+        "cr_code": "00000005"
+      }
+    ]
+  }
+}
