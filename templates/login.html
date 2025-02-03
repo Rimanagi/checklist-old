@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI Login</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Вход в систему</h2>
+        <form id="login-form">
+            <input type="text" id="username" placeholder="Введите имя пользователя" required>
+            <input type="password" id="password" placeholder="Введите пароль" required>
+            <button type="submit">Войти</button>
+            <p id="message"></p>
+        </form>
+        <div class="register-link">
+            <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("login-form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const messageBox = document.getElementById("message");
+
+            if (!username || !password) {
+                messageBox.innerText = "Username and password are required!";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("username", username);
+            formData.append("password", password);
+
+            const response = await fetch("/login", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                messageBox.style.color = "green";
+                messageBox.innerText = "Login successful! Redirecting...";
+                localStorage.setItem("access_token", data.access_token); // Сохраняем токен
+                setTimeout(() => { window.location.href = "/"; }, 2000);
+            } else {
+                messageBox.style.color = "red";
+                messageBox.innerText = data.detail;
+            }
+        });
+    </script>
+</body>
+</html>
