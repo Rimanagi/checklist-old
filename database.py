@@ -12,3 +12,6 @@ database = client.my_database
 
 # Получаем коллекцию (например, "locations")
 locations_collection = database.get_collection("locations")
+
+# Коллекция для сохранённых чеклистов
+checklists_collection = database.get_collection("checklists")

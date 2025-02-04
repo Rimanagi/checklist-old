@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Выбор локации</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .location-button {
+      display: block;
+      padding: 10px;
+      margin: 5px;
+      background-color: #667eea;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="bg-main">
+  <div class="container">
+    <h2>Выберите локацию</h2>
+    <input type="text" id="searchInput" placeholder="Поиск локации">
+    <div id="locationsList">
+      {% for loc in locations %}
+        <button class="location-button" onclick="selectLocation('{{ loc }}')">{{ loc }}</button>
+      {% endfor %}
+    </div>
+    <script>
+      function selectLocation(loc) {
+        const currentData = "{{ data | urlencode }}";
+        window.location.href = `/select_objects?location=${encodeURIComponent(loc)}&data=${currentData}`;
+      }
+
+      const searchInput = document.getElementById("searchInput");
+      searchInput.addEventListener("input", function() {
+        const filter = searchInput.value.toLowerCase();
+        const buttons = document.querySelectorAll(".location-button");
+        buttons.forEach(btn => {
+          if(btn.innerText.toLowerCase().startsWith(filter)) {
+            btn.style.display = "block";
+          } else {
+            btn.style.display = "none";
+          }
+        });
+      });
+    </script>
+  </div>
+</body>
+</html>
