@@ -3,30 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Вход в систему</title>
+  <title>Вход</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .container {
+      max-width: 400px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+  </style>
 </head>
 <body class="bg-login">
   <div class="container">
     <h2>Вход в систему</h2>
     <form method="post" action="/login">
-      <!-- Поле grant_type требуется для корректной работы OAuth2PasswordRequestForm -->
       <input type="hidden" name="grant_type" value="password">
       <input type="text" name="username" placeholder="Введите имя пользователя" required>
       <input type="password" name="password" placeholder="Введите пароль" required>
       <button type="submit">Войти</button>
     </form>
-    <!-- Сообщение об успешной регистрации -->
     {% if msg %}
       <p style="color: green;">{{ msg }}</p>
     {% endif %}
-    <!-- Сообщение об ошибке логина -->
     {% if error %}
       <p style="color: red;">{{ error }}</p>
     {% endif %}
-    <div class="register-link">
-      <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
-    </div>
+    <p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
   </div>
 </body>
 </html>

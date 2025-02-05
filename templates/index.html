@@ -1,72 +1,13 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Главная страница</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <style>
-    .main-container {
-      display: flex;
-      width: 80%;
-      margin: 0 auto;
-    }
-    .left-panel {
-      flex: 1;
-      margin-right: 20px;
-    }
-    .right-panel {
-      flex: 1;
-      margin-left: 20px;
-    }
-    .server-item {
-      border: 1px solid #ccc;
-      padding: 8px;
-      margin: 4px 0;
-      border-radius: 4px;
-    }
-    .menu-button {
-      display: block;
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body class="bg-main">
-  <div class="container">
-    <h2>Добро пожаловать, {{ username }}!</h2>
-    <div class="main-container">
-      <div class="left-panel">
-        <button class="menu-button" onclick="window.location='/checklists'">Чеклисты</button>
-        <button class="menu-button" onclick="window.location='/create_checklist'">Создать чеклист</button>
-        <button class="menu-button" onclick="window.location='/history'">История</button>
-      </div>
-      <div class="right-panel">
-        <h3>Подключенные серверы</h3>
-        <div id="server-list"></div>
+{% extends "base.html" %}
+{% block title %}Домой{% endblock %}
+{% block content %}
+  <div style="display: flex; align-items: flex-start;">
+    <div style="background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <h3 style="margin-top: 0;">Подключенные серверы</h3>
+      <div class="servers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+        <!-- Здесь должны отображаться серверы (например, динамически через WebSocket) -->
+        <p>Серверы не обнаружены</p>
       </div>
     </div>
   </div>
-  <script>
-    // Устанавливаем WebSocket‑соединение для получения обновлений списка серверов
-    let ws = new WebSocket(`ws://${location.host}/ws/servers/updates`);
-    ws.onmessage = function(event) {
-      let servers = JSON.parse(event.data);
-      let serverListDiv = document.getElementById("server-list");
-      serverListDiv.innerHTML = ""; // Очистка предыдущего списка
-      servers.forEach(function(server) {
-        let div = document.createElement("div");
-        div.className = "server-item";
-        div.innerHTML = `<strong>${server.name}</strong><br>IP: ${server.ip}`;
-        serverListDiv.appendChild(div);
-      });
-    };
-    ws.onclose = function() {
-      console.error("WebSocket connection closed");
-    };
-  </script>
-</body>
-</html>
+{% endblock %}

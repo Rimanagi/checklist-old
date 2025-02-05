@@ -1,7 +1,8 @@
 import uvicorn
 import json
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+import asyncio
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -12,7 +13,7 @@ from fastapi.encoders import jsonable_encoder
 import jwt
 from pydantic import BaseModel
 
-# Импортируем коллекции из файла database.py
+# Импортируем коллекции из database.py
 from database import locations_collection, checklists_collection
 from bson import ObjectId  # Для преобразования ObjectId в строку
 
@@ -29,8 +30,7 @@ fake_users_db = {}
 
 # Глобальные переменные для регистрации внешних серверов
 registered_servers = []  # Список серверов в формате { "name": ..., "ip": ... }
-update_clients = set()  # WebSocket‑соединения браузеров, которым отправляются обновления
-
+update_clients = set()   # WebSocket‑соединения браузеров для рассылки обновлений
 
 # Функция для рассылки обновлённого списка серверов всем WebSocket‑клиентам
 async def broadcast_server_list():
@@ -40,7 +40,6 @@ async def broadcast_server_list():
         except Exception:
             update_clients.remove(client)
 
-
 # ----------------------------
 # Модель пользователя и вспомогательные функции
 # ----------------------------
@@ -48,21 +47,17 @@ class User(BaseModel):
     username: str
     password: str
 
-
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 def verify_password(plain_password, hashed_password):
     return plain_password == hashed_password
 
-
 def get_password_hash(password):
     return password
-
 
 def get_current_user_from_cookie(request: Request):
     token = request.cookies.get("access_token")
@@ -77,10 +72,9 @@ def get_current_user_from_cookie(request: Request):
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-
 # ----------------------------
 # Middleware для проверки аутентификации для всех HTTP-запросов
-# (разрешён доступ к /login, /register, /static, /favicon.ico)
+# (разрешены /login, /register, /static, /favicon.ico)
 # ----------------------------
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -96,7 +90,6 @@ async def auth_middleware(request: Request, call_next):
         return RedirectResponse(url="/login")
     return await call_next(request)
 
-
 # ----------------------------
 # Эндпоинт для получения локаций из MongoDB
 # ----------------------------
@@ -105,7 +98,6 @@ async def get_locations():
     location_doc = await locations_collection.find_one({})
     return jsonable_encoder(location_doc, custom_encoder={ObjectId: str})
 
-
 # ----------------------------
 # Эндпоинты для регистрации и логина
 # ----------------------------
@@ -113,46 +105,36 @@ async def get_locations():
 def get_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
-
 @app.post("/register", response_class=HTMLResponse)
 def register(request: Request, username: str = Form(...), password: str = Form(...)):
     if username in fake_users_db:
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Пользователь с таким именем уже существует"}
-        )
+        return templates.TemplateResponse("register.html", {"request": request, "error": "Пользователь с таким именем уже существует"})
     fake_users_db[username] = get_password_hash(password)
     return RedirectResponse(url="/login?msg=Регистрация успешна! Теперь вы можете войти.", status_code=302)
-
 
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request, msg: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "msg": msg})
 
-
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     user = fake_users_db.get(form_data.username)
     if not user or not verify_password(form_data.password, user):
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Неверный логин или пароль"}
-        )
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Неверный логин или пароль"})
     access_token = create_access_token({"sub": form_data.username})
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
-
-# Главная страница
+# Главная страница (с отображением подключенных серверов в виде сетки)
 @app.get("/", response_class=HTMLResponse)
 def main_page(request: Request):
     try:
         username = get_current_user_from_cookie(request)
     except HTTPException:
         return RedirectResponse(url="/register", status_code=302)
+    # index.html теперь должен отображать подключенные серверы (например, через WebSocket)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
-
 
 @app.get("/servers")
 def get_servers(request: Request):
@@ -161,7 +143,6 @@ def get_servers(request: Request):
     except HTTPException:
         return RedirectResponse(url="/register", status_code=302)
     return {"message": f"Список серверов для пользователя {username}"}
-
 
 # ----------------------------
 # WebSocket‑эндпоинты для регистрации внешних серверов
@@ -186,7 +167,6 @@ async def ws_server_register(websocket: WebSocket):
             registered_servers.remove(server_info)
             await broadcast_server_list()
 
-
 @app.websocket("/ws/servers/updates")
 async def ws_server_updates(websocket: WebSocket):
     await websocket.accept()
@@ -200,7 +180,6 @@ async def ws_server_updates(websocket: WebSocket):
     finally:
         update_clients.remove(websocket)
 
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -211,13 +190,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
 
-
 # ----------------------------
 # Эндпоинты для работы с чеклистами
 # ----------------------------
 
-# Страница создания чеклиста.
-# Параметр data – URL-кодированная строка с текущим состоянием чеклиста (JSON).
+# Страница создания чеклиста. Состояние чеклиста передаётся через URL-параметр data.
 @app.get("/create_checklist", response_class=HTMLResponse)
 def create_checklist_page(request: Request, data: str = None):
     checklist = []
@@ -226,13 +203,9 @@ def create_checklist_page(request: Request, data: str = None):
             checklist = json.loads(urllib.parse.unquote(data))
         except Exception:
             checklist = []
-    return templates.TemplateResponse(
-        "create_checklist.html",
-        {"request": request, "checklist": checklist, "data": data or ""}
-    )
+    return templates.TemplateResponse("create_checklist.html", {"request": request, "checklist": checklist, "data": data or ""})
 
-
-# Страница выбора локации (с поиском)
+# Страница выбора локации в виде сетки.
 @app.get("/select_location", response_class=HTMLResponse)
 async def select_location(request: Request, data: str = None):
     doc = await locations_collection.find_one({})
@@ -241,15 +214,12 @@ async def select_location(request: Request, data: str = None):
         locations = list(doc.keys())
     else:
         locations = []
-    return templates.TemplateResponse(
-        "select_location.html",
-        {"request": request, "locations": locations, "data": data or ""}
-    )
+    return templates.TemplateResponse("select_location.html", {"request": request, "locations": locations, "data": data or ""})
 
-
-# Страница выбора объектов для выбранной локации
+# Страница выбора объектов для выбранной локации.
+# Параметр preselected (опционально) содержит JSON с предвыбранными объектами.
 @app.get("/select_objects", response_class=HTMLResponse)
-async def select_objects(request: Request, location: str, data: str = None):
+async def select_objects(request: Request, location: str, data: str = None, preselected: str = None):
     doc = await locations_collection.find_one({})
     if doc:
         doc.pop("_id", None)
@@ -259,19 +229,23 @@ async def select_objects(request: Request, location: str, data: str = None):
     if not location_data:
         return HTMLResponse(f"Локация {location} не найдена", status_code=404)
     objects = location_data.get("object_list", [])
-    return templates.TemplateResponse(
-        "select_objects.html",
-        {"request": request, "location": location, "objects": objects, "data": data or ""}
-    )
+    return templates.TemplateResponse("select_objects.html", {
+        "request": request,
+        "location": location,
+        "objects": objects,
+        "data": data or "",
+        "preselected": preselected or ""
+    })
 
-
-# Обработка добавления выбранной локации с объектами в чеклист
+# Обработка добавления (или обновления) выбранной локации с объектами в чеклист.
+# Если параметр index передан, обновляем существующий элемент.
 @app.post("/add_location")
 async def add_location(
-        request: Request,
-        location: str = Form(...),
-        selected_objects: str = Form(...),
-        data: str = Form("[]")
+    request: Request,
+    location: str = Form(...),
+    selected_objects: str = Form(...),
+    data: str = Form("[]"),
+    index: str = Form(None)
 ):
     try:
         current_checklist = json.loads(data)
@@ -282,10 +256,47 @@ async def add_location(
     except Exception:
         selected_objs = []
     new_item = {"location": location, "objects": selected_objs}
-    current_checklist.append(new_item)
+    if index is not None:
+        try:
+            idx = int(index)
+            if 0 <= idx < len(current_checklist):
+                current_checklist[idx] = new_item
+            else:
+                current_checklist.append(new_item)
+        except ValueError:
+            current_checklist.append(new_item)
+    else:
+        current_checklist.append(new_item)
     new_data = urllib.parse.quote(json.dumps(current_checklist))
     return RedirectResponse(url=f"/create_checklist?data={new_data}", status_code=302)
 
+# Удаление локации из чеклиста по индексу.
+@app.get("/delete_location", response_class=HTMLResponse)
+def delete_location(request: Request, index: int, data: str):
+    try:
+        current_checklist = json.loads(urllib.parse.unquote(data))
+    except Exception:
+        current_checklist = []
+    if 0 <= index < len(current_checklist):
+        current_checklist.pop(index)
+    new_data = urllib.parse.quote(json.dumps(current_checklist))
+    return RedirectResponse(url=f"/create_checklist?data={new_data}", status_code=302)
+
+# Редактирование локации: перенаправляем пользователя в выбор объектов с предвыбранными значениями.
+@app.get("/edit_location", response_class=HTMLResponse)
+def edit_location(request: Request, index: int, data: str):
+    try:
+        current_checklist = json.loads(urllib.parse.unquote(data))
+    except Exception:
+        current_checklist = []
+    if 0 <= index < len(current_checklist):
+        item = current_checklist[index]
+        location = item.get("location")
+        preselected = urllib.parse.quote(json.dumps(item.get("objects", [])))
+        # Передаём index, чтобы /add_location знал, что обновляем элемент.
+        redirect_url = f"/select_objects?location={urllib.parse.quote(location)}&data={urllib.parse.quote(data)}&preselected={preselected}&index={index}"
+        return RedirectResponse(url=redirect_url, status_code=302)
+    return RedirectResponse(url=f"/create_checklist?data={urllib.parse.quote(data)}", status_code=302)
 
 # Сохранение чеклиста в базу данных (коллекция checklists)
 @app.post("/save_checklist")
@@ -303,8 +314,7 @@ async def save_checklist(request: Request, data: str = Form("[]")):
     await checklists_collection.insert_one(document)
     return RedirectResponse(url="/checklists", status_code=302)
 
-
-# Страница просмотра сохранённых чеклистов
+# Страница просмотра сохранённых чеклистов.
 @app.get("/checklists", response_class=HTMLResponse)
 async def get_checklists(request: Request):
     checklists = []
@@ -312,14 +322,9 @@ async def get_checklists(request: Request):
     async for document in cursor:
         document.pop("_id", None)
         if "created_at" in document and isinstance(document["created_at"], datetime):
-            # Форматируем дату в виде dd-mm-yy hh:MM
             document["created_at"] = document["created_at"].strftime("%d-%m-%y %H:%M")
         checklists.append(document)
-    return templates.TemplateResponse(
-        "checklists.html",
-        {"request": request, "checklists": checklists}
-    )
-
+    return templates.TemplateResponse("checklists.html", {"request": request, "checklists": checklists})
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

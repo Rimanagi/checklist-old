@@ -1,80 +1,32 @@
-/* Базовые стили для body (без фонового цвета, чтобы задавать его через классы) */
+/* styles.css */
+
 body {
-    font-family: 'Arial', sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-/* Фон для страницы логина (оставляем текущий) */
-.bg-login {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-/* Фон для страницы регистрации — красный градиент */
-.bg-register {
-    background: linear-gradient(135deg, #f68b20, #ff4b2b);
-}
-
-/* Фон для главной страницы — зеленый градиент */
 .bg-main {
-    background: linear-gradient(135deg, #46ff6b, #3567ff);
+  background: linear-gradient(135deg, #56ab2f, #a8e063);
 }
 
-/* Стили для контейнера и элементов внутри него */
-.container {
-    width: 100%;
-    max-width: 400px;
-    padding: 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    text-align: center;
+.bg-login {
+  background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
-h2 {
-    color: #333;
-    margin-bottom: 20px;
+.bg-register {
+  background: linear-gradient(135deg, #ff416c, #ff4b2b);
 }
 
-input {
-    width: 90%;
-    padding: 10px;
-    margin: 10px 0;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    font-size: 16px;
-}
-
+/* Общие стили для кнопок и ссылок */
 button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    background: #667eea;
-    color: white;
-    font-size: 18px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-button:hover {
-    background: #5a67d8;
-}
-
-p {
-    color: red;
-    font-size: 14px;
+  cursor: pointer;
+  font-size: 16px;
 }
 
 a {
-    text-decoration: none;
-    color: #667eea;
-    font-size: 14px;
+  text-decoration: none;
+  color: #667eea;
 }
 
-a:hover {
-    text-decoration: underline;
-}
+/* Можно добавить дополнительные глобальные стили по необходимости */

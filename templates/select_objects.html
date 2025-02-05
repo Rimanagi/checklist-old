@@ -1,53 +1,39 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Выбор объектов для {{ location }}</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <style>
-    .object-item {
-      display: block;
-      margin: 5px;
-    }
-  </style>
-</head>
-<body class="bg-main">
-  <div class="container">
-    <h2>Выберите объекты для локации: {{ location }}</h2>
-    <form id="objectsForm" method="post" action="/add_location">
-      <input type="hidden" name="location" value="{{ location }}">
-      <input type="hidden" name="data" value="{{ data }}">
-      <!-- Скрытое поле для выбранных объектов в виде JSON -->
-      <input type="hidden" name="selected_objects" id="selectedObjects" value="[]">
-      <div>
-        {% for obj in objects %}
-          <label class="object-item">
-            <input type="checkbox" name="obj" value='{{ obj | tojson | safe }}'>
-            {{ obj.name }} ({{ obj.cr_code }})
-          </label>
-        {% endfor %}
-      </div>
-      <button type="button" onclick="submitObjects()">Добавить</button>
-    </form>
+{% extends "base.html" %}
+{% block title %}Выбор объектов{% endblock %}
+{% block content %}
+  <h2>Выберите объекты для локации: {{ location }}</h2>
+  <form id="objectsForm" method="post" action="/add_location">
+    <input type="hidden" name="location" value="{{ location }}">
+    <input type="hidden" name="data" value="{{ data }}">
+    <!-- Скрытое поле для выбранных объектов -->
+    <input type="hidden" name="selected_objects" id="selectedObjects" value="[]">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 20px;">
+      {% for obj in objects %}
+        <label style="display: block; background-color: #f0f8ff; padding: 10px; border-radius: 8px;">
+          <input type="checkbox" name="obj" value='{{ obj | tojson | safe }}'>
+          {{ obj.name }} ({{ obj.cr_code }})
+        </label>
+      {% endfor %}
+    </div>
     <br>
-    <button onclick="window.history.back()">Назад</button>
-    <script>
-      function submitObjects() {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"][name="obj"]:checked');
-        let selected = [];
-        checkboxes.forEach(cb => {
-          try {
-            const obj = JSON.parse(cb.value);
-            selected.push(obj);
-          } catch (e) {
-            console.error(e);
-          }
-        });
-        document.getElementById("selectedObjects").value = JSON.stringify(selected);
-        document.getElementById("objectsForm").submit();
-      }
-    </script>
-  </div>
-</body>
-</html>
+    <button type="button" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 8px;" onclick="submitObjects()">Добавить</button>
+  </form>
+  <br>
+  <button onclick="window.history.back()" style="padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 8px;">Назад</button>
+  <script>
+    function submitObjects() {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"][name="obj"]:checked');
+      let selected = [];
+      checkboxes.forEach(cb => {
+        try {
+          const obj = JSON.parse(cb.value);
+          selected.push(obj);
+        } catch (e) {
+          console.error(e);
+        }
+      });
+      document.getElementById("selectedObjects").value = JSON.stringify(selected);
+      document.getElementById("objectsForm").submit();
+    }
+  </script>
+{% endblock %}

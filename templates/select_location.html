@@ -1,50 +1,28 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Выбор локации</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <style>
-    .location-button {
-      display: block;
-      padding: 10px;
-      margin: 5px;
-      background-color: #667eea;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body class="bg-main">
-  <div class="container">
-    <h2>Выберите локацию</h2>
-    <input type="text" id="searchInput" placeholder="Поиск локации">
-    <div id="locationsList">
-      {% for loc in locations %}
-        <button class="location-button" onclick="selectLocation('{{ loc }}')">{{ loc }}</button>
-      {% endfor %}
-    </div>
-    <script>
-      function selectLocation(loc) {
-        const currentData = "{{ data | urlencode }}";
-        window.location.href = `/select_objects?location=${encodeURIComponent(loc)}&data=${currentData}`;
-      }
-
-      const searchInput = document.getElementById("searchInput");
-      searchInput.addEventListener("input", function() {
-        const filter = searchInput.value.toLowerCase();
-        const buttons = document.querySelectorAll(".location-button");
-        buttons.forEach(btn => {
-          if(btn.innerText.toLowerCase().startsWith(filter)) {
-            btn.style.display = "block";
-          } else {
-            btn.style.display = "none";
-          }
-        });
-      });
-    </script>
+{% extends "base.html" %}
+{% block title %}Выбор локации{% endblock %}
+{% block content %}
+  <h2>Выберите локацию</h2>
+  <input type="text" id="searchInput" placeholder="Поиск локации" style="width: 100%; padding: 8px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc;">
+  <div class="locations-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+    {% for loc in locations %}
+      <button style="padding: 10px; border-radius: 8px; background-color: #667eea; color: white; border: none;" onclick="selectLocation('{{ loc }}')">{{ loc }}</button>
+    {% endfor %}
   </div>
-</body>
-</html>
+  <script>
+    function selectLocation(loc) {
+      const currentData = "{{ data | urlencode }}";
+      window.location.href = "/select_objects?location=" + encodeURIComponent(loc) + "&data=" + currentData;
+    }
+    document.getElementById("searchInput").addEventListener("input", function(){
+      let filter = this.value.toLowerCase();
+      let buttons = document.querySelectorAll(".locations-grid button");
+      buttons.forEach(btn => {
+        if(btn.innerText.toLowerCase().startsWith(filter)){
+          btn.style.display = "block";
+        } else {
+          btn.style.display = "none";
+        }
+      });
+    });
+  </script>
+{% endblock %}
