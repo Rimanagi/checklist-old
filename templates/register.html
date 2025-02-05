@@ -5,30 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Регистрация</title>
   <link rel="stylesheet" href="/static/styles.css">
-  <style>
-    .container {
-      max-width: 400px;
-      margin: 50px auto;
-      padding: 20px;
-      background-color: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      text-align: center;
-    }
-  </style>
 </head>
 <body class="bg-register">
-  <div class="container">
-    <h2>Регистрация</h2>
-    <form method="post" action="/register">
-      <input type="text" name="username" placeholder="Имя пользователя" required>
-      <input type="password" name="password" placeholder="Пароль" required>
-      <button type="submit">Зарегистрироваться</button>
-    </form>
-    {% if error %}
-      <p style="color: red;">{{ error }}</p>
-    {% endif %}
-    <p>Уже есть аккаунт? <a href="/login">Войти</a></p>
+  <div class="auth-container">
+    <div class="auth-box">
+      <h2>Регистрация</h2>
+      <form method="post" action="/register">
+        <input type="text" name="username" class="auth-input" placeholder="Имя пользователя" required>
+        <input type="password" name="password" class="auth-input" placeholder="Пароль" required>
+        <button type="submit">Зарегистрироваться</button>
+      </form>
+      {% if error %}
+        <p class="error-msg">{{ error }}</p>
+      {% endif %}
+      <p class="register-link">Уже есть аккаунт? <a href="/login">Войти</a></p>
+    </div>
   </div>
 </body>
 </html>
