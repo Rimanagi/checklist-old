@@ -1,8 +1,9 @@
+import os
+from dotenv import load_dotenv
 import uvicorn
 import json
 import urllib.parse
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,26 +14,27 @@ from fastapi.encoders import jsonable_encoder
 import jwt
 from pydantic import BaseModel
 
-# Импортируем коллекции из database.py
 from database import locations_collection, checklists_collection
-from bson import ObjectId  # Для преобразования ObjectId в строку
+from bson import ObjectId
 
-SECRET_KEY = "your_secret_key"
+load_dotenv()  # Загружаем переменные из файла .env
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Простое in‑memory хранилище пользователей (НЕ для продакшена)
+# Простое in‑memory хранилище пользователей (для теста)
 fake_users_db = {}
 
 # Глобальные переменные для регистрации внешних серверов
-registered_servers = []  # Список серверов в формате { "name": ..., "ip": ... }
-update_clients = set()   # WebSocket‑соединения браузеров для рассылки обновлений
+registered_servers = []  # список серверов в виде {"name": ..., "ip": ...}
+update_clients = set()   # WebSocket-соединения браузеров для рассылки обновлений
 
-# Функция для рассылки обновлённого списка серверов всем WebSocket‑клиентам
 async def broadcast_server_list():
     for client in list(update_clients):
         try:
@@ -40,16 +42,13 @@ async def broadcast_server_list():
         except Exception:
             update_clients.remove(client)
 
-# ----------------------------
-# Модель пользователя и вспомогательные функции
-# ----------------------------
 class User(BaseModel):
     username: str
     password: str
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -66,16 +65,12 @@ def get_current_user_from_cookie(request: Request):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
-        if username is None or username not in fake_users_db:
+        if username is None or username != ADMIN_USERNAME:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         return username
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-# ----------------------------
-# Middleware для проверки аутентификации для всех HTTP-запросов
-# (разрешены /login, /register, /static, /favicon.ico)
-# ----------------------------
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     allowed_paths = ["/login", "/register", "/static", "/favicon.ico"]
@@ -91,26 +86,20 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 # ----------------------------
-# Эндпоинт для получения локаций из MongoDB
+# Эндпоинты для работы с базой (локации, регистрация, логин)
 # ----------------------------
 @app.get("/locations")
 async def get_locations():
     location_doc = await locations_collection.find_one({})
     return jsonable_encoder(location_doc, custom_encoder={ObjectId: str})
 
-# ----------------------------
-# Эндпоинты для регистрации и логина
-# ----------------------------
 @app.get("/register", response_class=HTMLResponse)
 def get_register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse("register.html", {"request": request, "error": "Регистрация отключена"})
 
 @app.post("/register", response_class=HTMLResponse)
 def register(request: Request, username: str = Form(...), password: str = Form(...)):
-    if username in fake_users_db:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Пользователь с таким именем уже существует"})
-    fake_users_db[username] = get_password_hash(password)
-    return RedirectResponse(url="/login?msg=Регистрация успешна! Теперь вы можете войти.", status_code=302)
+    return templates.TemplateResponse("register.html", {"request": request, "error": "Регистрация отключена"})
 
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request, msg: str = None):
@@ -118,22 +107,19 @@ def get_login_page(request: Request, msg: str = None):
 
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
-    user = fake_users_db.get(form_data.username)
-    if not user or not verify_password(form_data.password, user):
+    if form_data.username != ADMIN_USERNAME or form_data.password != ADMIN_PASSWORD:
         return templates.TemplateResponse("login.html", {"request": request, "error": "Неверный логин или пароль"})
     access_token = create_access_token({"sub": form_data.username})
     response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
-# Главная страница (с отображением подключенных серверов в виде сетки)
 @app.get("/", response_class=HTMLResponse)
 def main_page(request: Request):
     try:
         username = get_current_user_from_cookie(request)
     except HTTPException:
         return RedirectResponse(url="/register", status_code=302)
-    # index.html теперь должен отображать подключенные серверы (например, через WebSocket)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
 @app.get("/servers")
@@ -145,7 +131,7 @@ def get_servers(request: Request):
     return {"message": f"Список серверов для пользователя {username}"}
 
 # ----------------------------
-# WebSocket‑эндпоинты для регистрации внешних серверов
+# WebSocket-эндпоинты
 # ----------------------------
 @app.websocket("/ws/servers/register")
 async def ws_server_register(websocket: WebSocket):
@@ -194,32 +180,41 @@ async def websocket_endpoint(websocket: WebSocket):
 # Эндпоинты для работы с чеклистами
 # ----------------------------
 
-# Страница создания чеклиста. Состояние чеклиста передаётся через URL-параметр data.
+# Единый маршрут для создания/редактирования чеклиста
 @app.get("/create_checklist", response_class=HTMLResponse)
-def create_checklist_page(request: Request, data: str = None):
+def create_checklist_page(request: Request, data: str = None, checklist_id: str = None):
     checklist = []
     if data:
         try:
             checklist = json.loads(urllib.parse.unquote(data))
         except Exception:
             checklist = []
-    return templates.TemplateResponse("create_checklist.html", {"request": request, "checklist": checklist, "data": data or ""})
+    return templates.TemplateResponse("create_checklist.html", {
+        "request": request,
+        "checklist": checklist,
+        "data": data or "",
+        "checklist_id": checklist_id or ""
+    })
 
-# Страница выбора локации в виде сетки.
+# НОВЫЙ ЭНДПОИНТ: Страница выбора локации в виде сетки.
 @app.get("/select_location", response_class=HTMLResponse)
 async def select_location(request: Request, data: str = None):
+    # Читаем данные локаций из базы данных
     doc = await locations_collection.find_one({})
     if doc:
         doc.pop("_id", None)
         locations = list(doc.keys())
     else:
         locations = []
-    return templates.TemplateResponse("select_location.html", {"request": request, "locations": locations, "data": data or ""})
+    return templates.TemplateResponse("select_location.html", {
+        "request": request,
+        "locations": locations,
+        "data": data or ""
+    })
 
 # Страница выбора объектов для выбранной локации.
-# Параметр preselected (опционально) содержит JSON с предвыбранными объектами.
 @app.get("/select_objects", response_class=HTMLResponse)
-async def select_objects(request: Request, location: str, data: str = None, preselected: str = None):
+async def select_objects(request: Request, location: str, data: str = None, preselected: str = None, index: str = None):
     doc = await locations_collection.find_one({})
     if doc:
         doc.pop("_id", None)
@@ -229,24 +224,30 @@ async def select_objects(request: Request, location: str, data: str = None, pres
     if not location_data:
         return HTMLResponse(f"Локация {location} не найдена", status_code=404)
     objects = location_data.get("object_list", [])
+    preselected_list = []
+    if preselected:
+        try:
+            preselected_list = json.loads(preselected)
+        except Exception:
+            preselected_list = []
+    preselected_codes = [item.get("cr_code") for item in preselected_list]
     return templates.TemplateResponse("select_objects.html", {
         "request": request,
         "location": location,
         "objects": objects,
         "data": data or "",
-        "preselected": preselected or ""
+        "preselected": preselected_list,
+        "preselected_codes": preselected_codes,
+        "index": index
     })
 
-# Обработка добавления (или обновления) выбранной локации с объектами в чеклист.
-# Если параметр index передан, обновляем существующий элемент.
+# Добавление (или обновление) локации в чеклист.
 @app.post("/add_location")
-async def add_location(
-    request: Request,
-    location: str = Form(...),
-    selected_objects: str = Form(...),
-    data: str = Form("[]"),
-    index: str = Form(None)
-):
+async def add_location(request: Request,
+                       location: str = Form(...),
+                       selected_objects: str = Form(...),
+                       data: str = Form("[]"),
+                       index: str = Form(None)):
     try:
         current_checklist = json.loads(data)
     except Exception:
@@ -282,7 +283,7 @@ def delete_location(request: Request, index: int, data: str):
     new_data = urllib.parse.quote(json.dumps(current_checklist))
     return RedirectResponse(url=f"/create_checklist?data={new_data}", status_code=302)
 
-# Редактирование локации: перенаправляем пользователя в выбор объектов с предвыбранными значениями.
+# Редактирование локации: переходим на выбор объектов с предвыбранными значениями.
 @app.get("/edit_location", response_class=HTMLResponse)
 def edit_location(request: Request, index: int, data: str):
     try:
@@ -293,38 +294,63 @@ def edit_location(request: Request, index: int, data: str):
         item = current_checklist[index]
         location = item.get("location")
         preselected = urllib.parse.quote(json.dumps(item.get("objects", [])))
-        # Передаём index, чтобы /add_location знал, что обновляем элемент.
         redirect_url = f"/select_objects?location={urllib.parse.quote(location)}&data={urllib.parse.quote(data)}&preselected={preselected}&index={index}"
         return RedirectResponse(url=redirect_url, status_code=302)
     return RedirectResponse(url=f"/create_checklist?data={urllib.parse.quote(data)}", status_code=302)
 
-# Сохранение чеклиста в базу данных (коллекция checklists)
+# Сохранение чеклиста: обновление, если передан checklist_id, или создание нового.
 @app.post("/save_checklist")
-async def save_checklist(request: Request, data: str = Form("[]")):
+async def save_checklist(request: Request, data: str = Form("[]"), checklist_id: str = Form(None)):
     try:
         checklist = json.loads(data)
     except Exception:
         checklist = []
     if not checklist:
         return RedirectResponse(url="/create_checklist", status_code=302)
-    document = {
-        "checklist": checklist,
-        "created_at": datetime.utcnow()
-    }
-    await checklists_collection.insert_one(document)
+
+    # Проверяем, что checklist_id передан и не является пустой строкой
+    if checklist_id is not None and checklist_id.strip() != "":
+        # Обновляем существующий чеклист
+        await checklists_collection.update_one(
+            {"_id": ObjectId(checklist_id)},
+            {"$set": {"checklist": checklist, "created_at": datetime.utcnow()}}
+        )
+    else:
+        # Создаём новый чеклист
+        document = {
+            "checklist": checklist,
+            "created_at": datetime.utcnow()
+        }
+        await checklists_collection.insert_one(document)
     return RedirectResponse(url="/checklists", status_code=302)
 
-# Страница просмотра сохранённых чеклистов.
+# Просмотр сохранённых чеклистов.
 @app.get("/checklists", response_class=HTMLResponse)
 async def get_checklists(request: Request):
     checklists = []
     cursor = checklists_collection.find({})
     async for document in cursor:
+        document["id"] = str(document["_id"])
         document.pop("_id", None)
         if "created_at" in document and isinstance(document["created_at"], datetime):
             document["created_at"] = document["created_at"].strftime("%d-%m-%y %H:%M")
         checklists.append(document)
     return templates.TemplateResponse("checklists.html", {"request": request, "checklists": checklists})
+
+# Удаление чеклиста.
+@app.post("/delete_checklist")
+async def delete_checklist(request: Request, checklist_id: str = Form(...)):
+    await checklists_collection.delete_one({"_id": ObjectId(checklist_id)})
+    return RedirectResponse(url="/checklists", status_code=302)
+
+# Редактирование чеклиста: перенаправляем на create_checklist с данными.
+@app.get("/edit_checklist", response_class=HTMLResponse)
+async def edit_checklist(request: Request, checklist_id: str):
+    document = await checklists_collection.find_one({"_id": ObjectId(checklist_id)})
+    if not document:
+        return HTMLResponse("Чеклист не найден", status_code=404)
+    data = urllib.parse.quote(json.dumps(document.get("checklist", [])))
+    return RedirectResponse(url=f"/create_checklist?data={data}&checklist_id={checklist_id}", status_code=302)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

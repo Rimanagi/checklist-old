@@ -2,26 +2,26 @@
 {% block title %}Выбор локации{% endblock %}
 {% block content %}
   <h2>Выберите локацию</h2>
-  <input type="text" id="searchInput" placeholder="Поиск локации" style="width: 100%; padding: 8px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc;">
+  <input type="text" id="searchInput" placeholder="Поиск локации" style="width: 100%; padding: 8px; margin-bottom: 20px;">
   <div class="locations-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
     {% for loc in locations %}
-      <button style="padding: 10px; border-radius: 8px; background-color: #667eea; color: white; border: none;" onclick="selectLocation('{{ loc }}')">{{ loc }}</button>
+      <button onclick="selectLocation('{{ loc }}')" style="padding: 10px; background-color: #667eea; color: white; border: none; border-radius: 8px;">{{ loc }}</button>
     {% endfor %}
   </div>
   <script>
     function selectLocation(loc) {
-      const currentData = "{{ data | urlencode }}";
-      window.location.href = "/select_objects?location=" + encodeURIComponent(loc) + "&data=" + currentData;
+      const data = "{{ data | urlencode }}";
+      window.location.href = "/select_objects?location=" + encodeURIComponent(loc) + "&data=" + data;
     }
     document.getElementById("searchInput").addEventListener("input", function(){
       let filter = this.value.toLowerCase();
       let buttons = document.querySelectorAll(".locations-grid button");
       buttons.forEach(btn => {
-        if(btn.innerText.toLowerCase().startsWith(filter)){
-          btn.style.display = "block";
-        } else {
-          btn.style.display = "none";
-        }
+          if(btn.innerText.toLowerCase().includes(filter)){
+              btn.style.display = "block";
+          } else {
+              btn.style.display = "none";
+          }
       });
     });
   </script>

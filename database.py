@@ -1,8 +1,10 @@
-# database.py
+import os
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
+load_dotenv()
 # URL для подключения к MongoDB (можно менять, если у вас иные настройки)
-MONGO_DETAILS = "mongodb://localhost:27017"
+MONGO_DETAILS = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
 # Инициализируем асинхронного клиента
 client = AsyncIOMotorClient(MONGO_DETAILS)
