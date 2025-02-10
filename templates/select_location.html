@@ -5,13 +5,21 @@
   <input type="text" id="searchInput" placeholder="Поиск локации" style="width: 100%; padding: 8px; margin-bottom: 20px;">
   <div class="locations-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
     {% for loc in locations %}
-      <button onclick="selectLocation('{{ loc }}')" style="padding: 10px; background-color: #667eea; color: white; border: none; border-radius: 8px;">{{ loc }}</button>
+      <button onclick="selectLocation('{{ loc }}')"
+              style="padding: 10px; background-color: #667eea; color: white; border: none; border-radius: 8px;">
+        {{ loc }}
+      </button>
     {% endfor %}
   </div>
   <script>
     function selectLocation(loc) {
       const data = "{{ data | urlencode }}";
-      window.location.href = "/select_objects?location=" + encodeURIComponent(loc) + "&data=" + data;
+      {% if checklist_id %}
+        const checklistIdParam = "&checklist_id={{ checklist_id }}";
+      {% else %}
+        const checklistIdParam = "";
+      {% endif %}
+      window.location.href = "/select_objects?location=" + encodeURIComponent(loc) + "&data=" + data + checklistIdParam;
     }
     document.getElementById("searchInput").addEventListener("input", function(){
       let filter = this.value.toLowerCase();

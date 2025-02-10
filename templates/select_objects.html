@@ -8,6 +8,9 @@
     {% if index is not none %}
       <input type="hidden" name="index" value="{{ index }}">
     {% endif %}
+    {% if checklist_id %}
+      <input type="hidden" name="checklist_id" value="{{ checklist_id }}">
+    {% endif %}
     <input type="hidden" name="selected_objects" id="selectedObjects" value="[]">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 20px;">
       {% for obj in objects %}
@@ -19,14 +22,26 @@
       {% endfor %}
     </div>
     <br>
-    <button type="button" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 8px;" onclick="submitObjects()">Добавить</button>
+    <button type="button" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 8px;" onclick="submitObjects()">
+      Добавить
+    </button>
   </form>
   <br>
   {% if index is not none and data|length > 0 %}
-    <button onclick="window.location.href='/delete_location?index={{ index }}&data={{ data | urlencode }}'" style="padding: 10px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">Удалить</button>
+    {% if checklist_id %}
+      <button onclick="window.location.href='/delete_location?index={{ index }}&data={{ data | urlencode }}&checklist_id={{ checklist_id }}'" style="padding: 10px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">
+        Удалить
+      </button>
+    {% else %}
+      <button onclick="window.location.href='/delete_location?index={{ index }}&data={{ data | urlencode }}'" style="padding: 10px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">
+        Удалить
+      </button>
+    {% endif %}
   {% endif %}
   <br>
-  <button onclick="window.history.back()" style="padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 8px;">Назад</button>
+  <button onclick="window.history.back()" style="padding: 10px; background-color: #6c757d; color: white; border: none; border-radius: 8px;">
+    Назад
+  </button>
   <script>
     function submitObjects() {
       const checkboxes = document.querySelectorAll('input[type="checkbox"][name="obj"]:checked');

@@ -14,8 +14,8 @@
             {% endfor %}
           </ul>
           <div style="margin-top: 10px;">
-            <a href="/edit_location?index={{ loop.index0 }}&data={{ data | urlencode }}" style="padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 8px; text-decoration: none; margin-right: 5px;">Редактировать</a>
-            <a href="/delete_location?index={{ loop.index0 }}&data={{ data | urlencode }}" style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px; text-decoration: none;">Удалить</a>
+            <a href="/edit_location?index={{ loop.index0 }}&data={{ data | urlencode }}{% if checklist_id %}&checklist_id={{ checklist_id }}{% endif %}" style="padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 8px; text-decoration: none; margin-right: 5px;">Редактировать</a>
+            <a href="/delete_location?index={{ loop.index0 }}&data={{ data | urlencode }}{% if checklist_id %}&checklist_id={{ checklist_id }}{% endif %}" style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px; text-decoration: none;">Удалить</a>
           </div>
         </div>
       {% endfor %}
@@ -24,12 +24,10 @@
     {% endif %}
   </div>
   <div class="checklist-actions" style="background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <button onclick="window.location.href='/select_location?data={{ data | urlencode }}'" style="padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-right: 10px;">Добавить локацию</button>
+    <button onclick="window.location.href='/select_location?data={{ data | urlencode }}{% if checklist_id %}&checklist_id={{ checklist_id }}{% endif %}'" style="padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-right: 10px;">Добавить локацию</button>
     <form method="post" action="/save_checklist" style="display: inline;">
       <input type="hidden" name="data" value="{{ data }}">
-      {% if checklist_id %}
-        <input type="hidden" name="checklist_id" value="{{ checklist_id }}">
-      {% endif %}
+      <input type="hidden" name="checklist_id" value="{{ checklist_id }}">
       <button type="submit" style="padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 8px;">Сохранить чеклист</button>
     </form>
   </div>
