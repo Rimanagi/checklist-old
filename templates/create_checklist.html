@@ -25,9 +25,21 @@
   </div>
   <div class="checklist-actions" style="background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
     <button onclick="window.location.href='/select_location?data={{ data | urlencode }}{% if checklist_id %}&checklist_id={{ checklist_id }}{% endif %}'" style="padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-right: 10px;">Добавить локацию</button>
+    <!-- Форма сохранения чеклиста с выбором пользователя -->
     <form method="post" action="/save_checklist" style="display: inline;">
       <input type="hidden" name="data" value="{{ data }}">
       <input type="hidden" name="checklist_id" value="{{ checklist_id }}">
+      <div style="margin-bottom: 10px;">
+        <label for="selected_user"><strong>Выберите пользователя:</strong></label>
+        <select name="selected_user" id="selected_user" required>
+          <option value="">-- Выберите пользователя --</option>
+          {% for user in users %}
+            <option value="{{ user.username }}" {% if user.username == selected_user %}selected{% endif %}>
+              {{ user.full_name }} ({{ user.username }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
       <button type="submit" style="padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 8px;">Сохранить чеклист</button>
     </form>
   </div>

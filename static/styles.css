@@ -38,15 +38,15 @@ body {
   width: 350px;
 }
 
-/* Поля ввода (исправлены отступы) */
+/* Поля ввода */
 .auth-input {
-  width: calc(100% - 20px); /* Уменьшаем ширину на 20px для отступов */
+  width: calc(100% - 20px);
   padding: 10px;
   margin: 10px 0;
   border: 1px solid #ccc;
   border-radius: 8px;
   font-size: 16px;
-  box-sizing: border-box; /* Учитываем padding и border в размере */
+  box-sizing: border-box;
 }
 
 /* Кнопки */
@@ -90,4 +90,79 @@ body {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+/* Стили для выпадающего списка (select) */
+select {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+/* Стили для модального окна (например, при удалении чеклиста) */
+#deleteModal {
+  display: none; /* по умолчанию скрыто */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  align-items: center;
+  justify-content: center;
+}
+
+#deleteModal .modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  max-width: 300px;
+  margin: auto;
+}
+
+/* Дополнительные стили для новых кнопок и блоков на страницах */
+.button-green {
+  padding: 10px 15px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button-green:hover {
+  background-color: #218838;
+}
+
+.button-blue {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button-blue:hover {
+  background-color: #0069d9;
+}
+
+.button-red {
+  padding: 10px 15px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button-red:hover {
+  background-color: #c82333;
 }

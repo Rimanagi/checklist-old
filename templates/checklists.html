@@ -1,62 +1,91 @@
 {% extends "base.html" %}
 {% block title %}Чеклисты{% endblock %}
 {% block content %}
-  <h2>Список чеклистов</h2>
-  {% if checklists %}
-    <table class="checklists-table" style="width: 100%; border-collapse: collapse;">
-      <tr>
-      {% for checklist in checklists %}
+<h2>Список чеклистов</h2>
+{% if checklists %}
+<table class="checklists-table" style="width: 100%; border-collapse: collapse;">
+    <tr>
+        {% for checklist in checklists %}
         <td style="vertical-align: top; padding: 10px;">
-          <div class="checklist-container" style="background-color: white; border: 1px solid #ccc; border-radius: 12px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <p class="created-at" style="font-size: 14px; color: #555; margin-bottom: 10px;">
-              <strong>Создан:</strong> {{ checklist.created_at }}
-            </p>
-            {% set colors = ["#FFB6C1", "#FFDEAD", "#E6E6FA", "#F5DEB3", "#FFFACD", "#E0FFFF", "#F0FFF0"] %}
-            {% for item in checklist.checklist %}
-              <div class="location-block" style="background-color: {{ colors[loop.index0 % colors|length] }}; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
-                <div class="location-header" style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">Локация: {{ item.location }}</div>
-                <div class="object-list" style="margin-left: 15px;">
-                  <ul>
-                    {% for obj in item.objects %}
-                      <li>{{ obj.name }} ({{ obj.cr_code }})</li>
-                    {% endfor %}
-                  </ul>
+            <div class="checklist-container"
+                 style="background-color: white; border: 1px solid #ccc; border-radius: 12px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <!-- checklists.html (фрагмент внутри цикла по чеклистам) -->
+                <p class="created-at" style="font-size: 14px; color: #555; margin-bottom: 10px;">
+                    <strong>Создан:</strong> {{ checklist.created_at }}
+                </p>
+                {% if checklist.user and checklist.password %}
+                <p style="font-size: 14px; color: #333;">
+                    <strong>Пользователь:</strong> {{ checklist.user }} &nbsp;
+                    <strong>Пароль:</strong> {{ checklist.password }}
+                </p>
+                {% endif %}
+                {% set colors = ["#FFB6C1", "#FFDEAD", "#E6E6FA", "#F5DEB3", "#FFFACD", "#E0FFFF", "#F0FFF0"] %}
+                {% for item in checklist.checklist %}
+                <div class="location-block"
+                     style="background-color: {{ colors[loop.index0 % colors|length] }}; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    <div class="location-header" style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">
+                        Локация: {{ item.location }}
+                    </div>
+                    <div class="object-list" style="margin-left: 15px;">
+                        <ul>
+                            {% for obj in item.objects %}
+                            <li>{{ obj.name }} ({{ obj.cr_code }})</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
-              </div>
-            {% endfor %}
-            <div class="checklist-actions" style="margin-top: 10px;">
-              <button onclick="showDeleteModal('{{ checklist.id }}')" style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">Удалить</button>
-              <button onclick="window.location.href='/edit_checklist?checklist_id={{ checklist.id }}'" style="padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 8px; margin-left: 5px;">Редактировать</button>
-              <button onclick="alert('Отправить пока не реализовано')" style="padding: 8px 12px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-left: 5px;">Отправить</button>
+                {% endfor %}
+                <div class="checklist-actions" style="margin-top: 10px;">
+                    <button onclick="showDeleteModal('{{ checklist.id }}')"
+                            style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">
+                        Удалить
+                    </button>
+                    <button onclick="window.location.href='/edit_checklist?checklist_id={{ checklist.id }}'"
+                            style="padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 8px; margin-left: 5px;">
+                        Редактировать
+                    </button>
+                    <button onclick="alert('Отправить пока не реализовано')"
+                            style="padding: 8px 12px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-left: 5px;">
+                        Отправить
+                    </button>
+                </div>
             </div>
-          </div>
         </td>
         {% if loop.index % 3 == 0 and not loop.last %}
-      </tr><tr>
+    </tr>
+    <tr>
         {% endif %}
-      {% endfor %}
-      </tr>
-    </table>
-  {% else %}
-    <p style="text-align: center;">Чеклистов нет.</p>
-  {% endif %}
-  <div id="deleteModal" style="display:none; position: fixed; top: 0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        {% endfor %}
+    </tr>
+</table>
+{% else %}
+<p style="text-align: center;">Чеклистов нет.</p>
+{% endif %}
+<div id="deleteModal"
+     style="display:none; position: fixed; top: 0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
     <div style="background-color: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 300px; margin: auto;">
         <p>Вы уверены, что хотите удалить чеклист?</p>
         <form id="deleteForm" method="post" action="/delete_checklist">
             <input type="hidden" name="checklist_id" id="checklistIdInput" value="">
-            <button type="submit" style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">Удалить</button>
-            <button type="button" onclick="hideDeleteModal()" style="padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 8px; margin-left: 5px;">Назад</button>
+            <button type="submit"
+                    style="padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px;">
+                Удалить
+            </button>
+            <button type="button" onclick="hideDeleteModal()"
+                    style="padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 8px; margin-left: 5px;">
+                Назад
+            </button>
         </form>
     </div>
-  </div>
-  <script>
+</div>
+<script>
     function showDeleteModal(checklistId) {
         document.getElementById('checklistIdInput').value = checklistId;
         document.getElementById('deleteModal').style.display = 'flex';
     }
+
     function hideDeleteModal() {
         document.getElementById('deleteModal').style.display = 'none';
     }
-  </script>
+</script>
 {% endblock %}

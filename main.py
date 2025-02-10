@@ -1,4 +1,6 @@
 import os
+import string
+import random
 from dotenv import load_dotenv
 import uvicorn
 import json
@@ -14,7 +16,7 @@ from fastapi.encoders import jsonable_encoder
 import jwt
 from pydantic import BaseModel
 
-from database import locations_collection, checklists_collection
+from database import locations_collection, checklists_collection, users_collection, passwords_collection
 from bson import ObjectId
 
 load_dotenv()  # Загружаем переменные из файла .env
@@ -200,20 +202,33 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Единый маршрут для создания/редактирования чеклиста
 @app.get("/create_checklist", response_class=HTMLResponse)
-def create_checklist_page(request: Request, data: str = None, checklist_id: str = None):
+async def create_checklist_page(
+    request: Request,
+    data: str = None,
+    checklist_id: str = None,
+    selected_user: str = None
+):
     checklist = []
     if data:
         try:
             checklist = json.loads(urllib.parse.unquote(data))
         except Exception:
             checklist = []
+    # Получаем список пользователей
+    users = []
+    cursor = users_collection.find({})
+    async for user in cursor:
+        # Добавим id для шаблона, если потребуется
+        user["id"] = str(user["_id"])
+        users.append(user)
     return templates.TemplateResponse("create_checklist.html", {
         "request": request,
         "checklist": checklist,
         "data": data or "",
-        "checklist_id": checklist_id or ""
+        "checklist_id": checklist_id or "",
+        "users": users,
+        "selected_user": selected_user or ""
     })
-
 
 # НОВЫЙ ЭНДПОИНТ: Страница выбора локации в виде сетки.
 @app.get("/select_location", response_class=HTMLResponse)
@@ -343,7 +358,14 @@ def edit_location(request: Request, index: int, data: str, checklist_id: str = N
 
 # Сохранение чеклиста: обновление, если передан checklist_id, или создание нового.
 @app.post("/save_checklist")
-async def save_checklist(request: Request, data: str = Form("[]"), checklist_id: str = Form(None)):
+async def save_checklist(
+    request: Request,
+    data: str = Form("[]"),
+    checklist_id: str = Form(None),
+    selected_user: str = Form(...),
+):
+    if not selected_user:
+         return HTMLResponse("Ошибка: необходимо выбрать пользователя", status_code=400)
     try:
         checklist = json.loads(data)
     except Exception:
@@ -351,26 +373,34 @@ async def save_checklist(request: Request, data: str = Form("[]"), checklist_id:
     if not checklist:
         return RedirectResponse(url="/create_checklist", status_code=302)
 
-    print("DEBUG: checklist_id =", repr(checklist_id))  # Отладочный вывод checklist_id
-
     if checklist_id is not None and checklist_id.strip() != "":
-        # Пытаемся обновить существующий документ
-        result = await checklists_collection.update_one(
+        # Обновление существующего чеклиста
+        await checklists_collection.update_one(
             {"_id": ObjectId(checklist_id)},
             {"$set": {"checklist": checklist, "created_at": datetime.utcnow()}}
         )
-        print("DEBUG: update result - matched:", result.matched_count, "modified:", result.modified_count)
-        if result.matched_count == 0:
-            # Если документ с таким _id не найден, можно выбросить ошибку или сделать что-то ещё
-            print("DEBUG: Не найден документ с _id =", checklist_id)
+        # Обновляем выбранного пользователя в документе с паролем
+        await passwords_collection.update_one(
+            {"checklist_id": checklist_id},
+            {"$set": {"user": selected_user}}
+        )
     else:
-        # Если checklist_id не передан – вставляем новый документ
+        # Новый чеклист: вставляем документ и генерируем пароль
         document = {
             "checklist": checklist,
             "created_at": datetime.utcnow()
         }
         result = await checklists_collection.insert_one(document)
-        print("DEBUG: inserted new checklist with id =", result.inserted_id)
+        new_checklist_id = str(result.inserted_id)
+        # Генерируем 8-значный пароль (только цифры)
+        generated_password = ''.join(random.choices(string.digits, k=8))
+        password_doc = {
+            "checklist_id": new_checklist_id,
+            "user": selected_user,
+            "password": generated_password,
+            "created_at": datetime.utcnow()
+        }
+        await passwords_collection.insert_one(password_doc)
     return RedirectResponse(url="/checklists", status_code=302)
 
 
@@ -378,12 +408,20 @@ async def save_checklist(request: Request, data: str = Form("[]"), checklist_id:
 @app.get("/checklists", response_class=HTMLResponse)
 async def get_checklists(request: Request):
     checklists = []
-    cursor = checklists_collection.find({})
-    async for document in cursor:
-        document["id"] = str(document["_id"])
+    async for document in checklists_collection.find({}):
+        checklist_id = str(document["_id"])
+        document["id"] = checklist_id
         document.pop("_id", None)
         if "created_at" in document and isinstance(document["created_at"], datetime):
             document["created_at"] = document["created_at"].strftime("%d-%m-%y %H:%M")
+        # Получаем связанный документ с паролем
+        password_doc = await passwords_collection.find_one({"checklist_id": checklist_id})
+        if password_doc:
+            document["user"] = password_doc.get("user", "")
+            document["password"] = password_doc.get("password", "")
+        else:
+            document["user"] = ""
+            document["password"] = ""
         checklists.append(document)
     return templates.TemplateResponse("checklists.html", {"request": request, "checklists": checklists})
 
@@ -402,7 +440,12 @@ async def edit_checklist(request: Request, checklist_id: str):
     if not document:
         return HTMLResponse("Чеклист не найден", status_code=404)
     data = urllib.parse.quote(json.dumps(document.get("checklist", [])))
-    return RedirectResponse(url=f"/create_checklist?data={data}&checklist_id={checklist_id}", status_code=302)
+    password_doc = await passwords_collection.find_one({"checklist_id": checklist_id})
+    selected_user = password_doc.get("user") if password_doc else ""
+    return RedirectResponse(
+        url=f"/create_checklist?data={data}&checklist_id={checklist_id}&selected_user={selected_user}",
+        status_code=302
+    )
 
 
 if __name__ == "__main__":

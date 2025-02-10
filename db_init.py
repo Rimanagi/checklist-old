@@ -1,4 +1,3 @@
-# db_init.py
 import json
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,17 +8,28 @@ async def init_db():
     client = AsyncIOMotorClient(MONGO_DETAILS)
     db = client.my_database
     locations_collection = db.locations
+    users_collection = db.users
+    passwords_collection = db.passwords  # коллекция для хранения паролей
 
-    # Читаем файл data.json
+    # Инициализация локаций
     with open("data.json", "r", encoding="utf-8") as f:
         data = json.load(f)
-
-    # Если в коллекции уже есть данные, можно либо обновить, либо удалить и вставить заново.
-    # Здесь мы просто удаляем все и вставляем новые данные.
     await locations_collection.delete_many({})
-    # В данном примере мы вставляем один документ, содержащий весь объект.
-    result = await locations_collection.insert_one(data)
-    print("Inserted document id:", result.inserted_id)
+    await locations_collection.insert_one(data)
+
+    # Инициализация пользователей
+    await users_collection.delete_many({})
+    default_users = [
+        {"username": "user1", "full_name": "Пользователь Один"},
+        {"username": "user2", "full_name": "Пользователь Два"},
+        {"username": "user3", "full_name": "Пользователь Три"}
+    ]
+    result = await users_collection.insert_many(default_users)
+    print("Inserted default users:", result.inserted_ids)
+
+    # Очищаем коллекцию с паролями (если нужно)
+    await passwords_collection.delete_many({})
+
     client.close()
 
 if __name__ == "__main__":

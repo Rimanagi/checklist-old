@@ -17,3 +17,9 @@ locations_collection = database.get_collection("locations")
 
 # Коллекция для сохранённых чеклистов
 checklists_collection = database.get_collection("checklists")
+
+# работяги
+users_collection = database.get_collection("users")
+
+# одноразовые пароли
+passwords_collection = database.get_collection("passwords")
