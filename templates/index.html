@@ -4,10 +4,64 @@
   <div style="display: flex; align-items: flex-start;">
     <div style="background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
       <h3 style="margin-top: 0;">Подключенные серверы</h3>
-      <div class="servers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-        <!-- Здесь должны отображаться серверы (например, динамически через WebSocket) -->
-        <p>Серверы не обнаружены</p>
+      <div class="servers-grid" id="serversGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+        <p id="noServersMessage">Серверы не обнаружены</p>
       </div>
     </div>
   </div>
+
+  <script>
+    function renderServers(servers) {
+      const serversGrid = document.getElementById("serversGrid");
+      const noServersMessage = document.getElementById("noServersMessage");
+
+      // Очищаем текущий список серверов
+      serversGrid.innerHTML = '';
+
+      if (servers.length === 0) {
+        noServersMessage.style.display = 'block';
+      } else {
+        noServersMessage.style.display = 'none';
+
+        servers.forEach(server => {
+          const serverCard = document.createElement('div');
+          serverCard.style.backgroundColor = '#f0f8ff';
+          serverCard.style.padding = '10px';
+          serverCard.style.borderRadius = '8px';
+          serverCard.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+          serverCard.style.textAlign = 'center';
+
+          serverCard.innerHTML = `
+            <strong>${server.name}</strong><br>
+            <small>${server.ip}</small>
+          `;
+          serversGrid.appendChild(serverCard);
+        });
+      }
+    }
+
+    // Устанавливаем WebSocket соединение
+    const socket = new WebSocket(`ws://${window.location.host}/ws/servers/updates`);
+
+    socket.onopen = function () {
+      console.log("WebSocket соединение установлено.");
+    };
+
+    socket.onmessage = function (event) {
+      const servers = JSON.parse(event.data);
+      console.log("Обновление списка серверов:", servers);
+      renderServers(servers); // Отрисовываем список серверов
+    };
+
+    socket.onclose = function () {
+      console.log("WebSocket соединение закрыто. Переподключение через 5 секунд...");
+      setTimeout(() => {
+        location.reload(); // Попробуем перезагрузить страницу для переподключения
+      }, 5000);
+    };
+
+    socket.onerror = function (error) {
+      console.error("Ошибка WebSocket:", error);
+    };
+  </script>
 {% endblock %}

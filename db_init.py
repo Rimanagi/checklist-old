@@ -20,9 +20,9 @@ async def init_db():
     # Инициализация пользователей
     await users_collection.delete_many({})
     default_users = [
-        {"username": "user1", "full_name": "Пользователь Один"},
-        {"username": "user2", "full_name": "Пользователь Два"},
-        {"username": "user3", "full_name": "Пользователь Три"}
+        {"username": "Шухраджон Аббасович", "full_name": "Пользователь Один"},
+        {"username": "Камнев Иван", "full_name": "Пользователь Два"},
+        {"username": "Сантьяго Мазерати", "full_name": "Пользователь Три"}
     ]
     result = await users_collection.insert_many(default_users)
     print("Inserted default users:", result.inserted_ids)

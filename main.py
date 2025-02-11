@@ -203,10 +203,10 @@ async def websocket_endpoint(websocket: WebSocket):
 # Единый маршрут для создания/редактирования чеклиста
 @app.get("/create_checklist", response_class=HTMLResponse)
 async def create_checklist_page(
-    request: Request,
-    data: str = None,
-    checklist_id: str = None,
-    selected_user: str = None
+        request: Request,
+        data: str = None,
+        checklist_id: str = None,
+        selected_user: str = None
 ):
     checklist = []
     if data:
@@ -230,6 +230,7 @@ async def create_checklist_page(
         "selected_user": selected_user or ""
     })
 
+
 # НОВЫЙ ЭНДПОИНТ: Страница выбора локации в виде сетки.
 @app.get("/select_location", response_class=HTMLResponse)
 async def select_location(request: Request, data: str = None, checklist_id: str = None):
@@ -246,6 +247,7 @@ async def select_location(request: Request, data: str = None, checklist_id: str 
         "data": data or "",
         "checklist_id": checklist_id or ""
     })
+
 
 # Страница выбора объектов для выбранной локации.
 @app.get("/select_objects", response_class=HTMLResponse)
@@ -359,13 +361,13 @@ def edit_location(request: Request, index: int, data: str, checklist_id: str = N
 # Сохранение чеклиста: обновление, если передан checklist_id, или создание нового.
 @app.post("/save_checklist")
 async def save_checklist(
-    request: Request,
-    data: str = Form("[]"),
-    checklist_id: str = Form(None),
-    selected_user: str = Form(...),
+        request: Request,
+        data: str = Form("[]"),
+        checklist_id: str = Form(None),
+        selected_user: str = Form(...),
 ):
     if not selected_user:
-         return HTMLResponse("Ошибка: необходимо выбрать пользователя", status_code=400)
+        return HTMLResponse("Ошибка: необходимо выбрать пользователя", status_code=400)
     try:
         checklist = json.loads(data)
     except Exception:

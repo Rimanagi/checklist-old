@@ -35,7 +35,7 @@
           <option value="">-- Выберите пользователя --</option>
           {% for user in users %}
             <option value="{{ user.username }}" {% if user.username == selected_user %}selected{% endif %}>
-              {{ user.full_name }} ({{ user.username }})
+              {{ user.username }}
             </option>
           {% endfor %}
         </select>
