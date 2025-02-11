@@ -44,10 +44,88 @@
                             style="padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 8px; margin-left: 5px;">
                         Редактировать
                     </button>
-                    <button onclick="alert('Отправить пока не реализовано')"
+                    <button onclick='openSendModal({{ checklist|tojson|safe }})'
                             style="padding: 8px 12px; background-color: #28a745; color: white; border: none; border-radius: 8px; margin-left: 5px;">
                         Отправить
                     </button>
+
+                    <!-- Модальное окно для выбора сервера -->
+                    <div id="sendModal"
+                         style="display:none; position: fixed; top: 0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+                        <div style="background-color: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 400px; margin: auto;">
+                            <h3>Выберите сервер для отправки</h3>
+                            <div id="serverList"></div>
+                            <button onclick="closeSendModal()"
+                                    style="margin-top: 10px; padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 8px;">
+                                Отмена
+                            </button>
+                        </div>
+                    </div>
+
+                    <script>
+                        let currentChecklist = null;
+                        let availableServers = [];
+
+                        const serverSocket = new WebSocket(`ws://${window.location.host}/ws/servers/updates`);
+                        serverSocket.onmessage = function (event) {
+                            availableServers = JSON.parse(event.data);
+                            if (document.getElementById("sendModal").style.display === "flex") {
+                                renderServerList();
+                            }
+                        };
+
+                        function openSendModal(checklist) {
+                            currentChecklist = checklist;
+                            document.getElementById("sendModal").style.display = "flex";
+                            renderServerList();
+                        }
+
+                        function closeSendModal() {
+                            document.getElementById("sendModal").style.display = "none";
+                        }
+
+                        function renderServerList() {
+                            const serverListDiv = document.getElementById("serverList");
+                            serverListDiv.innerHTML = "";
+                            if (availableServers.length === 0) {
+                                serverListDiv.innerHTML = "<p>Нет подключенных серверов</p>";
+                                return;
+                            }
+                            availableServers.forEach(server => {
+                                const btn = document.createElement("button");
+                                btn.style.padding = "8px 12px";
+                                btn.style.backgroundColor = "#28a745";
+                                btn.style.color = "white";
+                                btn.style.border = "none";
+                                btn.style.borderRadius = "8px";
+                                btn.style.margin = "5px";
+                                btn.innerText = server.name + " (" + server.ip + ")";
+                                btn.onclick = function () {
+                                    sendChecklistToServer(server.ip);
+                                };
+                                serverListDiv.appendChild(btn);
+                            });
+                        }
+
+                        function sendChecklistToServer(server_ip) {
+                            fetch("/send_checklist", {
+                                method: "POST",
+                                headers: {"Content-Type": "application/json"},
+                                body: JSON.stringify({
+                                    checklist: currentChecklist,
+                                    server_ip: server_ip
+                                })
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    alert(data.detail);
+                                    closeSendModal();
+                                })
+                                .catch(err => {
+                                    alert("Ошибка отправки: " + err);
+                                });
+                        }
+                    </script>
                 </div>
             </div>
         </td>
