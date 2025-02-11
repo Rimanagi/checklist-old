@@ -32,12 +32,12 @@
     {% endif %}
   </div>
   <div class="checklist-actions" style="background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 10px;">
-    <!-- Кнопка "Добавить локацию" теперь с id для динамического обновления -->
+    <!-- Кнопка "Добавить локацию" с id для динамического обновления -->
     <button id="addLocationBtn" style="padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 8px;">
         Добавить локацию
     </button>
 
-    <!-- Группировка выпадающего списка и кнопки "Сохранить чеклист" -->
+    <!-- Форма с выпадающим списком и кнопкой "Сохранить чеклист" -->
     <form method="post" action="/save_checklist" style="display: flex; align-items: center; gap: 10px;">
         <input type="hidden" name="data" value="{{ data }}">
         <input type="hidden" name="checklist_id" value="{{ checklist_id }}">
@@ -60,9 +60,14 @@
   </div>
 
   <script>
-    // Функция обновляет ссылку у кнопки "Добавить локацию" и все ссылки с классом "preserve-user"
+    // Функция, обновляющая ссылки и кнопку "Добавить локацию" в зависимости от выбранного пользователя
     function updateLinksWithUser() {
       const selectedUser = document.getElementById("selected_user").value;
+
+      // Сохраняем выбранное значение в localStorage
+      if(selectedUser) {
+        localStorage.setItem("selected_user", selectedUser);
+      }
 
       // Формируем базовый URL для "Добавить локацию"
       let url = '/select_location?data={{ data | urlencode }}';
@@ -72,7 +77,6 @@
       if (selectedUser) {
          url += '&selected_user=' + encodeURIComponent(selectedUser);
       }
-      // Назначаем onclick для кнопки "Добавить локацию"
       document.getElementById("addLocationBtn").onclick = function() {
          window.location.href = url;
       };
@@ -80,21 +84,44 @@
       // Обновляем все ссылки с классом "preserve-user"
       const links = document.querySelectorAll('a.preserve-user');
       links.forEach(link => {
-        // Создаём объект URL из ссылки
         let linkUrl = new URL(link.href, window.location.origin);
         if (selectedUser) {
           linkUrl.searchParams.set('selected_user', selectedUser);
         } else {
           linkUrl.searchParams.delete('selected_user');
         }
-        // Обновляем href (без указания домена)
         link.href = linkUrl.pathname + linkUrl.search;
       });
     }
 
-    // При изменении выбранного пользователя обновляем ссылки
-    document.getElementById("selected_user").addEventListener('change', updateLinksWithUser);
-    // Обновляем ссылки при загрузке страницы
-    window.addEventListener('load', updateLinksWithUser);
+    // При загрузке страницы:
+    // 1. Если в URL отсутствует selected_user, пробуем установить его из localStorage.
+    // 2. Если localStorage содержит значение, устанавливаем его в селекте.
+    window.addEventListener('load', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let storedUser = localStorage.getItem("selected_user");
+      if (storedUser && !urlParams.has('selected_user')) {
+        urlParams.set('selected_user', storedUser);
+        const newUrl = window.location.pathname + '?' + urlParams.toString();
+        window.history.replaceState({}, '', newUrl);
+      }
+      if(storedUser) {
+        document.getElementById("selected_user").value = storedUser;
+      }
+      updateLinksWithUser();
+    });
+
+    // При изменении выбранного пользователя обновляем ссылки и URL
+    document.getElementById("selected_user").addEventListener('change', function() {
+      updateLinksWithUser();
+      const urlParams = new URLSearchParams(window.location.search);
+      if (this.value) {
+        urlParams.set('selected_user', this.value);
+      } else {
+        urlParams.delete('selected_user');
+      }
+      const newUrl = window.location.pathname + '?' + urlParams.toString();
+      window.history.replaceState({}, '', newUrl);
+    });
   </script>
 {% endblock %}
