@@ -38,6 +38,7 @@ fake_users_db = {}
 registered_servers = []
 update_clients = set()  # WebSocket‑соединения браузеров для рассылки обновлений
 
+
 async def broadcast_server_list():
     sanitized_servers = [{"name": s["name"], "ip": s["ip"]} for s in registered_servers]
     for client in list(update_clients):
@@ -46,9 +47,11 @@ async def broadcast_server_list():
         except Exception:
             update_clients.remove(client)
 
+
 class User(BaseModel):
     username: str
     password: str
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -56,11 +59,14 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+
 def verify_password(plain_password, hashed_password):
     return plain_password == hashed_password
 
+
 def get_password_hash(password):
     return password
+
 
 def get_current_user_from_cookie(request: Request):
     token = request.cookies.get("access_token")
@@ -74,6 +80,7 @@ def get_current_user_from_cookie(request: Request):
         return username
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -89,6 +96,7 @@ async def auth_middleware(request: Request, call_next):
         return RedirectResponse(url="/login")
     return await call_next(request)
 
+
 # ----------------------------
 # Эндпоинты для работы с базой (локации, регистрация, логин)
 # ----------------------------
@@ -97,17 +105,21 @@ async def get_locations():
     location_doc = await locations_collection.find_one({})
     return jsonable_encoder(location_doc, custom_encoder={ObjectId: str})
 
+
 @app.get("/register", response_class=HTMLResponse)
 def get_register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request, "error": "Регистрация отключена"})
+
 
 @app.post("/register", response_class=HTMLResponse)
 def register(request: Request, username: str = Form(...), password: str = Form(...)):
     return templates.TemplateResponse("register.html", {"request": request, "error": "Регистрация отключена"})
 
+
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request, msg: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "msg": msg})
+
 
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
@@ -118,6 +130,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
+
 @app.get("/", response_class=HTMLResponse)
 def main_page(request: Request):
     try:
@@ -126,6 +139,7 @@ def main_page(request: Request):
         return RedirectResponse(url="/register", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request, "username": username})
 
+
 @app.get("/servers")
 def get_servers(request: Request):
     try:
@@ -133,6 +147,7 @@ def get_servers(request: Request):
     except HTTPException:
         return RedirectResponse(url="/register", status_code=302)
     return {"message": f"Список серверов для пользователя {username}"}
+
 
 # ----------------------------
 # WebSocket-эндпоинты
@@ -158,6 +173,7 @@ async def ws_server_register(websocket: WebSocket):
             registered_servers.remove(server_info)
             await broadcast_server_list()
 
+
 @app.websocket("/ws/servers/updates")
 async def ws_server_updates(websocket: WebSocket):
     await websocket.accept()
@@ -171,6 +187,7 @@ async def ws_server_updates(websocket: WebSocket):
     finally:
         update_clients.remove(websocket)
 
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -180,6 +197,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_text(f"Message received: {data}")
     except WebSocketDisconnect:
         pass
+
 
 # ----------------------------
 # Эндпоинты для работы с чеклистами
@@ -215,6 +233,7 @@ async def create_checklist_page(
         "selected_user": selected_user or ""
     })
 
+
 # Страница выбора локации (с добавлением selected_user).
 @app.get("/select_location", response_class=HTMLResponse)
 async def select_location(request: Request, data: str = None, checklist_id: str = None, selected_user: str = None):
@@ -231,6 +250,7 @@ async def select_location(request: Request, data: str = None, checklist_id: str 
         "checklist_id": checklist_id or "",
         "selected_user": selected_user or ""
     })
+
 
 # Страница выбора объектов для выбранной локации (selected_user передаётся дальше).
 @app.get("/select_objects", response_class=HTMLResponse)
@@ -263,6 +283,7 @@ async def select_objects(request: Request, location: str, data: str = None, pres
         "checklist_id": checklist_id,
         "selected_user": selected_user or ""
     })
+
 
 # Добавление (или обновление) локации в чеклист.
 @app.post("/add_location")
@@ -304,6 +325,7 @@ async def add_location(
         redirect_url += f"&selected_user={selected_user}"
     return RedirectResponse(url=redirect_url, status_code=302)
 
+
 # Удаление локации из чеклиста по индексу.
 @app.get("/delete_location", response_class=HTMLResponse)
 def delete_location(request: Request, index: int, data: str, checklist_id: str = None, selected_user: str = None):
@@ -321,6 +343,7 @@ def delete_location(request: Request, index: int, data: str, checklist_id: str =
     if selected_user:
         redirect_url += f"&selected_user={selected_user}"
     return RedirectResponse(url=redirect_url, status_code=302)
+
 
 # Редактирование локации: переход на выбор объектов с предвыбранными значениями.
 @app.get("/edit_location", response_class=HTMLResponse)
@@ -344,6 +367,7 @@ def edit_location(request: Request, index: int, data: str, checklist_id: str = N
             redirect_url += f"&selected_user={selected_user}"
         return RedirectResponse(url=redirect_url, status_code=302)
     return RedirectResponse(url=f"/create_checklist?data={urllib.parse.quote(data)}", status_code=302)
+
 
 # Сохранение чеклиста: обновление, если передан checklist_id, или создание нового.
 @app.post("/save_checklist")
@@ -388,6 +412,7 @@ async def save_checklist(
         await passwords_collection.insert_one(password_doc)
     return RedirectResponse(url="/checklists", status_code=302)
 
+
 # Просмотр сохранённых чеклистов.
 @app.get("/checklists", response_class=HTMLResponse)
 async def get_checklists(request: Request):
@@ -408,11 +433,13 @@ async def get_checklists(request: Request):
         checklists.append(document)
     return templates.TemplateResponse("checklists.html", {"request": request, "checklists": checklists})
 
+
 # Удаление чеклиста.
 @app.post("/delete_checklist")
 async def delete_checklist(request: Request, checklist_id: str = Form(...)):
     await checklists_collection.delete_one({"_id": ObjectId(checklist_id)})
     return RedirectResponse(url="/checklists", status_code=302)
+
 
 # Редактирование чеклиста: перенаправляем на create_checklist с данными.
 @app.get("/edit_checklist", response_class=HTMLResponse)
@@ -431,12 +458,13 @@ async def edit_checklist(request: Request, checklist_id: str, selected_user: str
         status_code=302
     )
 
+
 # Новый эндпоинт для отправки чеклиста на внешний сервер по WebSocket.
 @app.post("/send_checklist")
 async def send_checklist(
-    checklist: dict = Body(...),
-    server_ip: str = Body(...),
-    current_user: str = Depends(get_current_user_from_cookie)
+        checklist: dict = Body(...),
+        server_ip: str = Body(...),
+        current_user: str = Depends(get_current_user_from_cookie)
 ):
     target_server = None
     for s in registered_servers:
@@ -450,6 +478,7 @@ async def send_checklist(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send checklist: {str(e)}")
     return {"detail": "Checklist sent successfully"}
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
