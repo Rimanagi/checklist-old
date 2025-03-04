@@ -23,3 +23,5 @@ users_collection = database.get_collection("users")
 
 # одноразовые пароли
 passwords_collection = database.get_collection("passwords")
+logs_collection = database.get_collection("logs")
+checklists_received_collection = database.get_collection("checklists_received")

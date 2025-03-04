@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import uvicorn
 import json
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request, Form, Body
 from fastapi.security import OAuth2PasswordRequestForm
@@ -16,7 +16,12 @@ from fastapi.encoders import jsonable_encoder
 import jwt
 from pydantic import BaseModel
 
-from database import locations_collection, checklists_collection, users_collection, passwords_collection
+from database import (locations_collection,
+                      checklists_collection,
+                      users_collection,
+                      passwords_collection,
+                      logs_collection,
+                      checklists_received_collection)
 from bson import ObjectId
 
 load_dotenv()  # Загружаем переменные из файла .env
@@ -55,7 +60,7 @@ class User(BaseModel):
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -197,6 +202,46 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_text(f"Message received: {data}")
     except WebSocketDisconnect:
         pass
+
+
+@app.websocket("/ws/receive")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("✅ Cоединение на подключение")
+
+    try:
+        while True:
+            message = await websocket.receive_text()
+            data = json.loads(message)
+
+            if "filename" in data and "content" in data:
+                file_name = data["filename"]
+                file_id, file_ext = file_name.split(".")
+                content = data["content"]
+
+                # Определяем тип файла
+                if file_ext == "json":
+                    collection = checklists_received_collection
+                    content = json.loads(content)  # Преобразуем JSON-строку в объект
+                elif file_id == "txt":
+                    collection = logs_collection
+                else:
+                    print(f"⚠️ Неподдерживаемый формат: {file_id}")
+                    continue
+
+                # Вставка в MongoDB (заменяет, если ID уже существует)
+                await collection.update_one(
+                    {"_id": file_id},
+                    {"$set": {"content": content}},
+                    upsert=True  # если документа нет, то создается новый
+                )
+
+                print(f"📁 Файл {file_id} сохранен в коллекции {collection.name}")
+
+    except Exception as e:
+        print(f"⚠️ Ошибка: {e}")
+    finally:
+        await websocket.close()
 
 
 # ----------------------------
@@ -389,7 +434,7 @@ async def save_checklist(
     if checklist_id is not None and checklist_id.strip() != "":
         await checklists_collection.update_one(
             {"_id": ObjectId(checklist_id)},
-            {"$set": {"checklist": checklist, "created_at": datetime.utcnow()}}
+            {"$set": {"checklist": checklist, "created_at": datetime.now()}}
         )
         await passwords_collection.update_one(
             {"checklist_id": checklist_id},
@@ -398,7 +443,7 @@ async def save_checklist(
     else:
         document = {
             "checklist": checklist,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now()
         }
         result = await checklists_collection.insert_one(document)
         new_checklist_id = str(result.inserted_id)
@@ -407,7 +452,7 @@ async def save_checklist(
             "checklist_id": new_checklist_id,
             "user": selected_user,
             "password": generated_password,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now()
         }
         await passwords_collection.insert_one(password_doc)
     return RedirectResponse(url="/checklists", status_code=302)
